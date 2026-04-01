@@ -169,3 +169,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **javalang** and **pycparser** communities for robust parsing libraries
 - **Python difflib** for unified difference generation
 
+  
+## Research
+
+- ** This project was presented as a research paper at:
+-16th IEEE ICCNT 2025 — IIT Indore, July 6–11, 2025
+- ** "SHAP-Coded Insights: Interpretable Structural Similarity of Programs with GraphCodeBERT"
+- ** Amal S, Niranjan A. R, M. G. Thushara — Amrita Vishwa Vidyapeetham
