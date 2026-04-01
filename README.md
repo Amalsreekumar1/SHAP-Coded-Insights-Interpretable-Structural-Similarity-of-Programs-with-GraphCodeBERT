@@ -1,7 +1,9 @@
-# SHAP-CodedInsights: Interpretable Structural Similarity of Programs with GraphCodeBERT
+# SHAP-Coded Insights: Interpretable Structural Similarity of Programs with GraphCodeBERT
 
-An interpretable code similarity analysis tool designed for educational feedback. It compares a student's code with a correct reference solution using GraphCodeBERT embeddings, AST structural similarity, token overlap, and unified diff. The system also uses SHAP explainability to show which features contributed to the similarity score.
+Published at IEEE ICCNT 2025 — 16th International Conference on Computing, Communication and Networking Technologies, IIT Indore, July 2025.
 
+A code similarity analysis system for programming education that combines transformer-based semantic embeddings, AST structural comparison, and SHAP explainability to produce both a similarity score and actionable feedback for students.
+Unlike traditional tools (MOSS, JPlag) that rely on token matching, this system recognizes logically equivalent code written in different styles — and explains why two submissions are similar or different.
 ## 🌟 Key Features
 
 ### 🔍 Multi-Dimensional Code Analysis
