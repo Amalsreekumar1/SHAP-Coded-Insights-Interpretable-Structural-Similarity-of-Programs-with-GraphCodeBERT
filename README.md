@@ -35,8 +35,8 @@ Unlike traditional tools (MOSS, JPlag) that rely on token matching, this system 
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/SHAP-CodedInsights.git
-cd SHAP-CodedInsights
+git clone https://github.com/Amalsreekumar1/SHAP-Coded-Insights-Interpretable-Structural-Similarity-of-Programs-with-GraphCodeBERT.git
+cd SHAP-Coded-Insights-Interpretable-Structural-Similarity-of-Programs-with-GraphCodeBERT
 
 # Install dependencies
 pip install -r requirements.txt
