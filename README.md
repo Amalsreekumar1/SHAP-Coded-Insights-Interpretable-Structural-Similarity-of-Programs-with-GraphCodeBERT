@@ -4,15 +4,15 @@ Published at IEEE ICCNT 2025 — 16th International Conference on Computing, Com
 
 A code similarity analysis system for programming education that combines transformer-based semantic embeddings, AST structural comparison, and SHAP explainability to produce both a similarity score and actionable feedback for students.
 Unlike traditional tools (MOSS, JPlag) that rely on token matching, this system recognizes logically equivalent code written in different styles — and explains why two submissions are similar or different.
-## 🌟 Key Features
+##  Key Features
 
-### 🔍 Multi-Dimensional Code Analysis
+###  Multi-Dimensional Code Analysis
 - **GraphCodeBERT Semantic Similarity**: Measures contextual code similarity using transformer embeddings that capture control and data flow
 - **AST Structural Comparison**: Analyzes program structure through Abstract Syntax Trees for both C (pycparser) and Java (javalang)
 - **Token Overlap Analysis**: Lightweight lexical similarity metric for quick baseline comparison
 - **Unified Diff Visualization**: Highlights exact line-level differences between student and correct code
 
-### 📊 Intelligent Scoring System
+###  Intelligent Scoring System
 - **Weighted Similarity Calculation**:
   - GraphCodeBERT Similarity: 50%
   - AST Similarity: 35%
@@ -20,12 +20,12 @@ Unlike traditional tools (MOSS, JPlag) that rely on token matching, this system 
 - **Categorical Feedback**: Excellent, Great, Partial, or Significant similarity ratings
 - **Numerical Scores**: Range from 0.00 to 1.00 for precise assessment
 
-### 💡 Explainable AI Feedback
+###  Explainable AI Feedback
 - **SHAP-Based Explainability**: Shows which features (GraphCodeBERT, AST, tokens, line count) influenced the similarity score
 - **Feature Attribution**: Understand why code is similar or different through detailed breakdowns
 - **Targeted Recommendations**: Actionable feedback for students to improve their code
 
-## 🚀 Quick Start
+##  Quick Start
 
 ### Prerequisites
 - Python 3.7+
@@ -83,7 +83,7 @@ Feedback:
   Workscorrectly,butstructurediffersnoticeably.
 ```
 
-## 📋 Technical Architecture
+##  Technical Architecture
 
 ### Core Components
 1. **Preprocessing Module**: Normalizes code by removing comments and whitespace
@@ -118,7 +118,7 @@ javalang==0.13.0
 pycparser==2.21
 ```
 
-## 📁 Project Structure
+##  Project Structure
 
 ```
 SHAP-CodedInsights/
@@ -130,7 +130,7 @@ SHAP-CodedInsights/
 └── docs/               # Documentation and examples
 ```
 
-## 🎯 Educational Benefits
+##  Educational Benefits
 
 ### For Students
 - **Transparent Assessment**: Understand exactly how similarity scores are calculated
@@ -142,7 +142,7 @@ SHAP-CodedInsights/
 - **Consistent Evaluation**: Standardized similarity measurement across submissions
 - **Insightful Analytics**: Understand common student mistakes and approaches
 
-## 🔮 Future Enhancements
+##  Future Enhancements
 
 - **Extended Language Support**: Add Python, C++, and JavaScript support
 - **Behavioral Analysis**: Compare program execution traces for functional equivalence
@@ -150,7 +150,7 @@ SHAP-CodedInsights/
 - **Web Interface**: Create a GUI dashboard for easy access and visualization
 - **Integration APIs**: Connect with learning management systems (LMS)
 
-## 🤝 Contributing
+##  Contributing
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
@@ -158,11 +158,11 @@ SHAP-CodedInsights/
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
-## 📄 License
+##  License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgements
+##  Acknowledgements
 
 - **Microsoft GraphCodeBERT Team** for the pre-trained model
 - **SHAP (SHapley Additive exPlanations)** framework for explainable AI
