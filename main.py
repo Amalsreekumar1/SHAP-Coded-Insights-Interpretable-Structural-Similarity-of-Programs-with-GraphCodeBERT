@@ -5,13 +5,14 @@ from transformers import AutoTokenizer, AutoModel
 import shap
 from sklearn.ensemble import RandomForestRegressor
 import numpy as np
-from typing import List
+from typing import List, Dict, Set, Tuple
 import os
 import difflib
 import javalang
 from pycparser import c_parser, c_ast
 import subprocess
 import tempfile
+from collections import Counter
 
 tokenizer = AutoTokenizer.from_pretrained("microsoft/graphcodebert-base")
 model = AutoModel.from_pretrained("microsoft/graphcodebert-base")
@@ -26,7 +27,7 @@ def normalize_code(code: str) -> str:
 def detect_language(code: str) -> str:
     if "class " in code:
         return "java"
-    elif "int " in code or "void " in code:
+    elif "int " in code or "void " in code or "#include" in code:
         return "c"
     return "unknown"
 
@@ -42,10 +43,13 @@ def compute_gcb_similarity(code1: str, code2: str) -> float:
     return F.cosine_similarity(emb1, emb2).item()
 
 def token_overlap_similarity(code1: str, code2: str) -> float:
-    tokens1 = set(code1.split())
-    tokens2 = set(code2.split())
-    common = tokens1.intersection(tokens2)
-    return len(common) / max(len(tokens1), len(tokens2)) if max(len(tokens1), len(tokens2)) > 0 else 1.0
+    tokens1 = code1.split()
+    tokens2 = code2.split()
+    c1 = Counter(tokens1)
+    c2 = Counter(tokens2)
+    common_tokens_count = sum((c1 & c2).values())
+    total_tokens = max(len(tokens1), len(tokens2))
+    return common_tokens_count / total_tokens if total_tokens > 0 else 1.0
 
 def _preprocess_c_code(code: str) -> str:
     fake_header = """
@@ -74,48 +78,10 @@ def _preprocess_c_code(code: str) -> str:
         preprocessed = result.stdout
         preprocessed = re.sub(r'"[^"]*"', 'STRING_LITERAL', preprocessed)
         return preprocessed
-    except subprocess.CalledProcessError as e:
+    except subprocess.CalledProcessError:
         return full_code
     finally:
         os.remove(temp_file_path)
-
-def compute_ast_similarity(code1: str, code2: str, language1: str, language2: str) -> float:
-    if language1 != language2:
-        return 0.0
-    if language1 == "c":
-        return _compute_c_ast_similarity(code1, code2)
-    elif language1 == "java":
-        return _compute_java_ast_similarity(code1, code2)
-    return 0.0
-
-def _compute_c_ast_similarity(code1: str, code2: str) -> float:
-    try:
-        code1_pre = _preprocess_c_code(code1)
-        code2_pre = _preprocess_c_code(code2)
-        parser = c_parser.CParser()
-        ast1 = parser.parse(code1_pre, filename='<none>')
-        ast2 = parser.parse(code2_pre, filename='<none>')
-        nodes1 = _get_c_ast_nodes(ast1)
-        nodes2 = _get_c_ast_nodes(ast2)
-        common_nodes = set(nodes1).intersection(set(nodes2))
-        total_nodes = max(len(set(nodes1)), len(set(nodes2)))
-        return len(common_nodes) / total_nodes if total_nodes > 0 else 1.0
-    except Exception as e:
-        print(f"Error parsing C AST: {e}")
-        return difflib.SequenceMatcher(None, normalize_code(code1), normalize_code(code2)).ratio()
-
-def _compute_java_ast_similarity(code1: str, code2: str) -> float:
-    try:
-        tree1 = javalang.parse.parse(code1)
-        tree2 = javalang.parse.parse(code2)
-        nodes1 = _get_java_ast_nodes(tree1)
-        nodes2 = _get_java_ast_nodes(tree2)
-        common_nodes = set(nodes1).intersection(set(nodes2))
-        total_nodes = max(len(set(nodes1)), len(set(nodes2)))
-        return len(common_nodes) / total_nodes if total_nodes > 0 else 1.0
-    except javalang.parser.JavaSyntaxError as e:
-        print(f"Error parsing Java AST: {e}")
-        return difflib.SequenceMatcher(None, normalize_code(code1), normalize_code(code2)).ratio()
 
 def _get_c_ast_nodes(node: c_ast.Node) -> List[str]:
     nodes = [type(node).__name__]
@@ -129,40 +95,61 @@ def _get_java_ast_nodes(tree) -> List[str]:
         nodes.append(type(node).__name__)
     return nodes
 
-def compute_combined_similarity(code1: str, code2: str) -> float:
-    code1_norm = normalize_code(code1)
-    code2_norm = normalize_code(code2)
-    lang1 = detect_language(code1_norm)
-    lang2 = detect_language(code2_norm)
-    if lang1 != lang2:
-        return 0.0
-    gcb_sim = compute_gcb_similarity(code1_norm, code2_norm)
-    ast_sim = compute_ast_similarity(code1, code2, lang1, lang2)
-    token_sim = token_overlap_similarity(code1_norm, code2_norm)
-    return (0.5 * gcb_sim) + (0.35 * ast_sim) + (0.15 * token_sim)
+def compute_ast_similarity_and_diff(code1: str, code2: str, language: str) -> Tuple[float, List[str], List[str]]:
+    if language == "c":
+        try:
+            code1_pre = _preprocess_c_code(code1)
+            code2_pre = _preprocess_c_code(code2)
+            parser = c_parser.CParser()
+            ast1 = parser.parse(code1_pre, filename='<none>')
+            ast2 = parser.parse(code2_pre, filename='<none>')
+            nodes1 = _get_c_ast_nodes(ast1)
+            nodes2 = _get_c_ast_nodes(ast2)
+        except Exception:
+            ratio = difflib.SequenceMatcher(None, normalize_code(code1), normalize_code(code2)).ratio()
+            return ratio, [], []
+    elif language == "java":
+        try:
+            tree1 = javalang.parse.parse(code1)
+            tree2 = javalang.parse.parse(code2)
+            nodes1 = _get_java_ast_nodes(tree1)
+            nodes2 = _get_java_ast_nodes(tree2)
+        except Exception:
+            ratio = difflib.SequenceMatcher(None, normalize_code(code1), normalize_code(code2)).ratio()
+            return ratio, [], []
+    else:
+        return 0.0, [], []
 
-def _extract_features(code1: str, code2: str, language1: str, language2: str) -> np.ndarray:
-    code1_norm = normalize_code(code1)
-    code2_norm = normalize_code(code2)
-    return np.array([
-        compute_gcb_similarity(code1_norm, code2_norm),
-        compute_ast_similarity(code1, code2, language1, language2),
-        token_overlap_similarity(code1_norm, code2_norm),
-        len(code1_norm.split()),
-        len(code2_norm.split()),
-        len(code1_norm.splitlines())
-    ])
+    c1 = Counter(nodes1)
+    c2 = Counter(nodes2)
+    
+    common_nodes_counter = c1 & c2
+    common_nodes_count = sum(common_nodes_counter.values())
+    total_nodes = max(len(nodes1), len(nodes2))
+    ast_sim = common_nodes_count / total_nodes if total_nodes > 0 else 1.0
+
+    dissimilar_student = list((c1 - common_nodes_counter).keys())
+    dissimilar_correct = list((c2 - common_nodes_counter).keys())
+
+    return ast_sim, dissimilar_student, dissimilar_correct
+
+def train_surrogate_model() -> RandomForestRegressor:
+    np.random.seed(42)
+    X_sim = np.random.uniform(0.4, 1.0, (200, 3))
+    X_stats = np.random.uniform(10, 150, (200, 3))
+    X = np.hstack((X_sim, X_stats))
+    
+    y = (0.5 * X[:, 0]) + (0.35 * X[:, 1]) + (0.15 * X[:, 2])
+    
+    rf_model = RandomForestRegressor(n_estimators=100, random_state=42)
+    rf_model.fit(X, y)
+    return rf_model
 
 def explain_diff(code1: str, code2: str) -> List[str]:
     lines1 = code1.splitlines(keepends=True)
     lines2 = code2.splitlines(keepends=True)
-    diff = difflib.unified_diff(
-        lines1, lines2,
-        fromfile="Student",
-        tofile="Correct",
-        lineterm=""
-    )
-    diff_lines = [line.rstrip() for line in diff if line.startswith('+') or line.startswith('-') or line.startswith('@@') or line.startswith('---') or line.startswith('+++')]
+    diff = difflib.unified_diff(lines1, lines2, fromfile="Student", tofile="Correct", lineterm="")
+    diff_lines = [line.rstrip() for line in diff if line.startswith('+') or line.startswith('-') or line.startswith('@@')]
     return diff_lines if diff_lines else ["No significant differences detected."]
 
 def _generate_shap_explanation(shap_values: np.ndarray, feature_names: List[str]) -> str:
@@ -177,36 +164,50 @@ def _generate_shap_explanation(shap_values: np.ndarray, feature_names: List[str]
 def analyze_code(student_code: str, correct_code: str):
     lang1 = detect_language(student_code)
     lang2 = detect_language(correct_code)
-    if lang1 != lang2:
-        print("Error: Codes are in different languages.")
+    if lang1 != lang2 or lang1 == "unknown":
+        print("Error: Codes are in different or unsupported languages.")
         return
 
-    norm_student_code = normalize_code(student_code)
-    norm_correct_code = normalize_code(correct_code)
-    similarity = compute_combined_similarity(student_code, correct_code)
-    features = _extract_features(student_code, correct_code, lang1, lang2)
-    explanation = explain_diff(student_code, correct_code)
-
-    X = np.random.rand(100, 6)
-    y = np.random.rand(100)
-    rf_model = RandomForestRegressor(n_estimators=100, random_state=42)
-    rf_model.fit(X, y)
+    norm_student = normalize_code(student_code)
+    norm_correct = normalize_code(correct_code)
+    
+    gcb_sim = compute_gcb_similarity(norm_student, norm_correct)
+    ast_sim, diss_student, diss_correct = compute_ast_similarity_and_diff(student_code, correct_code, lang1)
+    token_sim = token_overlap_similarity(norm_student, norm_correct)
+    
+    similarity = (0.5 * gcb_sim) + (0.35 * ast_sim) + (0.15 * token_sim)
+    
+    features = np.array([
+        gcb_sim, ast_sim, token_sim,
+        len(norm_student.split()), len(norm_correct.split()), len(norm_student.splitlines())
+    ])
+    
+    rf_model = train_surrogate_model()
     explainer = shap.TreeExplainer(rf_model)
     shap_values = explainer.shap_values(features.reshape(1, -1))
+    
     feature_names = [
         "GraphCodeBERT similarity", "AST similarity", "Token overlap",
-        "Tokens in student code", "Tokens in correct code",
-        "Lines in student code"
+        "Tokens in student code", "Tokens in correct code", "Lines in student code"
     ]
     shap_explanation = _generate_shap_explanation(shap_values, feature_names)
 
     print(f"Combined Similarity with correct solution: {similarity:.2f}")
     print("\nExplanation of Differences:")
-    for line in explanation:
+    for line in explain_diff(student_code, correct_code):
         print(line)
+        
     print("\nSHAP Explanation:")
     print(shap_explanation)
-    print("\nFeedback:")
+    
+    if (shap_values[0][1] < 0 or similarity < 0.90) and (diss_student or diss_correct):
+        print("\nTargeted Structural Feedback (AST Deviations):")
+        if diss_student:
+            print(f"  - Structural structures found in your code but absent from solution: {', '.join(diss_student)}")
+        if diss_correct:
+            print(f"  - Expected structures missing from your implementation: {', '.join(diss_correct)}")
+
+    print("\nFeedback Evaluation Categorization:")
     if similarity > 0.98:
         print("  Excellent work! Your logic and structure almost perfectly match the correct solution.")
     elif similarity > 0.90:
@@ -223,28 +224,21 @@ def read_code_from_file(file_path: str) -> str:
         return file.read()
 
 def main():
-    print("Code Comparison Tool")
-    print("====================")
+    print("Code Comparison Tool (Validated Alignment Version)")
+    print("==================================================")
     language = input("Enter the programming language (java or c): ").lower()
     if language not in ["java", "c"]:
         print("Error: Please enter 'java' or 'c' only.")
         return
-    student_file = input(f"Enter the path to the student's {language} code file (e.g., student.{language}): ")
-    correct_file = input(f"Enter the path to the correct {language} solution file (e.g., correct.{language}): ")
+    student_file = input(f"Enter the path to the student's {language} code file: ")
+    correct_file = input(f"Enter the path to the correct {language} solution file: ")
     try:
         student_code = read_code_from_file(student_file)
         correct_code = read_code_from_file(correct_file)
-        detected_lang1 = detect_language(student_code)
-        detected_lang2 = detect_language(correct_code)
-        if detected_lang1 != language or detected_lang2 != language:
-            print(f"Error: One or both files do not match the specified language ({language}).")
-            return
         print(f"\n{language.upper()} Code Comparison: {os.path.basename(student_file)} vs {os.path.basename(correct_file)}")
         analyze_code(student_code, correct_code)
-    except FileNotFoundError as e:
-        print(f"Error: {e}")
     except Exception as e:
-        print(f"An unexpected error occurred: {e}")
+        print(f"An error occurred: {e}")
 
 if __name__ == "__main__":
     main()
